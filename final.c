@@ -6,6 +6,9 @@
 //size_t TO int
 //-1 CONDTION IN CONTAINS
 //CHECKS FOR PTHREAD
+//FREE THINGS
+
+//num words as input
 
 
 //options:
@@ -32,10 +35,20 @@
 #define MAXTHRED 4
 
 
+typedef struct threadInfo{
+    char* charArr;
+    int start;
+    int end;
+    int *perLoc;
+    int numDesWords;
+    char* desiredWords;
+} threadInfo_t;
+
+
 //return 0 if the word appears in the sentence and 1 if it does
 
-int wordAppears(char* word, char* sent){
-    size_t sentLength = strlen(sent);
+int wordAppears(char* word, char* sent, int start, int end){
+    //size_t sentLength = strlen(sent);
     size_t wordLength = strlen(word);
     //location of start of word if found, 0 if not
     int contains = 0;
@@ -43,7 +56,7 @@ int wordAppears(char* word, char* sent){
     int sentLoc = 0;
     int numWords = 0;
     //iterate through sentence until is could not contain word
-    for(int i=0; i<(sentLength-1); i++){
+    for(int i=start; i<(end-1); i++){
         if(contains != 0){
             break;
         }
@@ -62,6 +75,35 @@ int wordAppears(char* word, char* sent){
         }
     }
     return contains;
+}
+
+void* locate(void* infoStruct){
+    threadInfo_t* info = (threadInfo_t*) infoStruct;
+    int numDesWords = info->numDesWords;
+    int* numFoundWords;
+    char* words = info->desiredWords;
+    //to hold counts of words
+    numFoundWords = malloc(numDesWords);
+    char word[strlen(words)];
+    int wordLoc = 0;
+    int wordArrLoc = 0;
+    for(int i = 0; i < strlen(info->desiredWords); i++){
+        //ADD OTHER PUNC
+        while((words[i] != ' ') && (words[i] != '.')){
+            word[wordLoc] = words[i];
+            wordLoc++;
+            i++;
+        }
+        word[wordLoc] = '\0';
+        numFoundWords[wordArrLoc] = wordAppears(word, info->charArr, info->start, info->end);
+        for(int j = 0; j < wordLoc; j++){
+            word[j] = '\0';
+        }
+        wordLoc = 0;
+        wordArrLoc++;
+
+    }
+    return (void*)numFoundWords;
 }
 
 int main(int argc, char** argv){
@@ -127,20 +169,36 @@ int main(int argc, char** argv){
         printf("%c",charArr[i]);
     }
 
-    pthread_t threads[MAX_THREAD]; 
+    printf("\n");
+    //CHANGE THIS
+    char* desiredWords = "this is";
+    threadInfo_t* info = (threadInfo_t*)malloc(sizeof(threadInfo_t));
+    info->charArr = charArr;
+    info->desiredWords = desiredWords;
+    info->start = 0;
+    info->end = 20;
+    info->perLoc = periods;
+    info->numDesWords = 1;
+
+    int* numFoundWords = (int*)locate((void*)info);
+
+    printf("found1: %d\n", numFoundWords[0]);
+    printf("found2: %d\n", numFoundWords[1]);
+
+    //pthread_t threads[MAX_THREAD]; 
  
     // Creating 4 threads 
-    for (int i = 0; i < MAX_THREAD; i++) 
-        pthread_create(&threads[i], NULL, sum_array, (void*)charArr); 
+    //for (int i = 0; i < MAX_THREAD; i++) 
+ //       pthread_create(&threads[i], NULL, sum_array, (void*)charArr); 
  
     // joining 4 threads i.e. waiting for all 4 threads to complete 
-    for (int i = 0; i < MAX_THREAD; i++) 
-        pthread_join(threads[i], NULL); 
+   // for (int i = 0; i < MAX_THREAD; i++) 
+     //   pthread_join(threads[i], NULL); 
  
     // adding sum of all 4 parts 
-    int total_sum = 0; 
-    for (int i = 0; i < MAX_THREAD; i++) 
-        total_sum += sum[i]; 
+    //int total_sum = 0; 
+    //for (int i = 0; i < MAX_THREAD; i++) 
+      //  total_sum += sum[i]; 
 
         //needs to be passed:
         // -char array
@@ -156,11 +214,8 @@ int main(int argc, char** argv){
         // -end
 
         //divide number of sentences and start from beginning of sentence
-
-
-    printf("\n");
-    char* testWord = "this";
-    int testContains = wordAppears(testWord, charArr);
-    printf("contains: %d\n", testContains);
+    //char* testWord = "this";
+    //int testContains = wordAppears(testWord, charArr);
+    //printf("contains: %d\n", testContains);
     return 0;
 }
