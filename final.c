@@ -7,6 +7,11 @@
 //-1 CONDTION IN CONTAINS
 //CHECKS FOR PTHREAD
 //FREE THINGS
+//HOW EFFICIENT DOES IT NEED TO BE
+//NOTE MAX WORDS SIZE
+//WHAT IS DES AND COMP WORD IS THE SAME
+//PLURALS
+//DOES strcpy NEED MALLOC
 
 //num words as input
 
@@ -33,14 +38,18 @@
 #define LOCARRSIZE 50
 //number of threads
 #define MAXTHRED 4
+//max length of word
+#define MAXWORD 30
 
 
 typedef struct threadInfo{
     char* charArr;
+    //will be the indices within the periods array
     int start;
     int end;
     int *perLoc;
     int numDesWords;
+    char* compWord;
     char* desiredWords;
 } threadInfo_t;
 
@@ -60,6 +69,7 @@ int wordAppears(char* word, char* sent, int start, int end){
         if(contains != 0){
             break;
         }
+        //if a letter doesn't match, begin looking again
         for(int j=0; j<wordLength; j++){
             if(word[j] != sent[i+sentLoc]){
                 sentLoc = 0;
@@ -67,8 +77,9 @@ int wordAppears(char* word, char* sent, int start, int end){
             }
             //MAKE SURE TO TEST THIS
             //if word is found, make sure that it is the end of a word
+            //COULD BE COMMA, SEMICOLON ETC.
             if(sentLoc == (wordLength-1) && (sent[i + sentLoc + 1] == ' ')){
-                contains = (i);
+                contains = 1;
                 break;
             }
             sentLoc++;
@@ -84,24 +95,50 @@ void* locate(void* infoStruct){
     char* words = info->desiredWords;
     //to hold counts of words
     numFoundWords = malloc(numDesWords);
-    char word[strlen(words)];
+    //hold array of word counts
+    char word[MAXWORD];
+    char* wordStr = malloc(sizeof(char)*MAXWORD);
     int wordLoc = 0;
     int wordArrLoc = 0;
-    for(int i = 0; i < strlen(info->desiredWords); i++){
-        //ADD OTHER PUNC
-        while((words[i] != ' ') && (words[i] != '.')){
-            word[wordLoc] = words[i];
-            wordLoc++;
-            i++;
+    //hold start and end of desired sentence
+    int sentStart = 0;
+    int sentEnd = 0;
+    //check for all desired words
+    //IS END-1 CORRECT?
+    for(int i = info->start; i < info->end; i++){
+        wordArrLoc = 0;
+        //get charArr position for beginning and end of sentence
+        sentStart = info->perLoc[i];
+        sentEnd = info->perLoc[i+1];
+        //check if compare word is in sentence, if it is not move to next
+        if (wordAppears(info->compWord, info->charArr, sentStart, sentEnd) == 0){
+            break;
         }
-        word[wordLoc] = '\0';
-        numFoundWords[wordArrLoc] = wordAppears(word, info->charArr, info->start, info->end);
-        for(int j = 0; j < wordLoc; j++){
-            word[j] = '\0';
-        }
-        wordLoc = 0;
-        wordArrLoc++;
+        for(int k = 0; k < strlen(info->desiredWords); k++){
+            //isolate each word
+            //desired words are seperated by new line
+            while((words[k] != '\n')){
+                word[wordLoc] = words[k];
+                wordLoc++;
+                k++;
+            }
+            //convert to string with nothing extra at end
+            word[wordLoc] = '\0';
+            strcpy(wordStr, word);
+            //if word appears increment association count
+            if(wordAppears(word, info->charArr, sentStart, sentEnd) == 1){
+                numFoundWords[wordArrLoc]++;
+            }
+            //empty word array
+            for(int j = 0; j < wordLoc; j++){
+                word[j] = '\0';
+            }
+            //empty string
+            memset(wordStr, 0, strlen(wordStr));
+            wordLoc = 0;
+            wordArrLoc++;
 
+        }
     }
     return (void*)numFoundWords;
 }
@@ -121,11 +158,13 @@ int main(int argc, char** argv){
     //index 1 - periods
     int arrFull[2] = {0,0};
     //array to keep track of total in arrays, same indices as above
-    int totalNum[2] = {0,0};
+    //start periods at 1 becasue first sentence will begin at 0, not loc of first period
+    int totalNum[2] = {0,1};
     //keep track of period locations
     int *periods = NULL;
     periods = malloc(LOCARRSIZE);
-
+    //set start location to 0
+    periods[0] = 0;
     int compCount = 0;
  
 
@@ -148,7 +187,9 @@ int main(int argc, char** argv){
             charArr = realloc(charArr, (totalNum[0] + ARRSIZE));
             arrFull[0] = 0;
         }
-
+        //set first element to 0 so it starts at beginning of sentence
+        //periods[0] = 0;
+        //totalNum[1]++;
         if(ch == '.'){
             //check if arry is full
             if(arrFull[1] == (LOCARRSIZE - 1)){
@@ -171,14 +212,24 @@ int main(int argc, char** argv){
 
     printf("\n");
     //CHANGE THIS
-    char* desiredWords = "this is";
+    int numDesWords = 1;
+    //the word to be compares to others
+    char* compWord = "friend";
+    //the words to compare to the main word
+    char* desiredWords = "dear\ntest\n";
+    char desiredWordsArr[numDesWords][MAXWORD];
+    memset(desiredWordsArr, 0, (numDesWords*MAXWORD*sizeof(char)));
+    strcpy(desiredWordsArr[0], "this");
+
+    //declare info object and fill fields
     threadInfo_t* info = (threadInfo_t*)malloc(sizeof(threadInfo_t));
     info->charArr = charArr;
-    info->desiredWords = desiredWords;
     info->start = 0;
-    info->end = 20;
+    info->end = 3;
     info->perLoc = periods;
-    info->numDesWords = 1;
+    info->desiredWords = desiredWords;
+    info->numDesWords = numDesWords;
+    info->compWord = compWord;
 
     int* numFoundWords = (int*)locate((void*)info);
 
