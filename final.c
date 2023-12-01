@@ -12,6 +12,7 @@
 //WHAT IS DES AND COMP WORD IS THE SAME
 //PLURALS
 //DOES strcpy NEED MALLOC
+//LESS SENTENCES THAN 4
 
 //num words as input
 
@@ -29,17 +30,23 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <string.h>
+#include <pthread.h>
 
 //max size for file input name
 #define FILENAMESIZE 300
 //max size for array to hold all chars
-#define ARRSIZE 3
+#define ARRSIZE 300
 //size for location markers
 #define LOCARRSIZE 50
 //number of threads
-#define MAXTHRED 4
+#define MAXTHREAD 4
 //max length of word
 #define MAXWORD 30
+//max number of words to compare
+#define MAXWORDCOMP 100
+
+int numFoundWords[MAXWORDCOMP];
+pthread_mutex_t lock;
 
 
 typedef struct threadInfo{
@@ -48,9 +55,14 @@ typedef struct threadInfo{
     int start;
     int end;
     int *perLoc;
+    //number of desired words
     int numDesWords;
+    //word everything will be compared to
     char* compWord;
+    //desired words
     char* desiredWords;
+    //array to hold association counts
+    //int* numFoundWords;
 } threadInfo_t;
 
 
@@ -91,10 +103,9 @@ int wordAppears(char* word, char* sent, int start, int end){
 void* locate(void* infoStruct){
     threadInfo_t* info = (threadInfo_t*) infoStruct;
     int numDesWords = info->numDesWords;
-    int* numFoundWords;
     char* words = info->desiredWords;
     //to hold counts of words
-    numFoundWords = malloc(numDesWords);
+    //numFoundWords = malloc(numDesWords);
     //hold array of word counts
     char word[MAXWORD];
     char* wordStr = malloc(sizeof(char)*MAXWORD);
@@ -103,6 +114,8 @@ void* locate(void* infoStruct){
     //hold start and end of desired sentence
     int sentStart = 0;
     int sentEnd = 0;
+    char* compWord = info->compWord;
+    char* charArr = info->charArr;
     //check for all desired words
     //IS END-1 CORRECT?
     for(int i = info->start; i < info->end; i++){
@@ -111,7 +124,7 @@ void* locate(void* infoStruct){
         sentStart = info->perLoc[i];
         sentEnd = info->perLoc[i+1];
         //check if compare word is in sentence, if it is not move to next
-        if (wordAppears(info->compWord, info->charArr, sentStart, sentEnd) == 0){
+        if (wordAppears(compWord, charArr, sentStart, sentEnd) == 0){
             break;
         }
         for(int k = 0; k < strlen(info->desiredWords); k++){
@@ -127,7 +140,10 @@ void* locate(void* infoStruct){
             strcpy(wordStr, word);
             //if word appears increment association count
             if(wordAppears(word, info->charArr, sentStart, sentEnd) == 1){
+                //((threadInfo_t*) infoStruct)->numFoundWords[wordArrLoc]++;
+                pthread_mutex_lock(&lock);
                 numFoundWords[wordArrLoc]++;
+                pthread_mutex_unlock(&lock);
             }
             //empty word array
             for(int j = 0; j < wordLoc; j++){
@@ -140,7 +156,7 @@ void* locate(void* infoStruct){
 
         }
     }
-    return (void*)numFoundWords;
+    pthread_exit(NULL);
 }
 
 int main(int argc, char** argv){
@@ -165,7 +181,26 @@ int main(int argc, char** argv){
     periods = malloc(LOCARRSIZE);
     //set start location to 0
     periods[0] = 0;
-    int compCount = 0;
+    //int compCount = 0;
+
+
+
+    //CHANGE THIS
+
+    
+    int numDesWords = 2;
+    //the word to be compares to others
+    char* compWord = "friend";
+    //the words to compare to the main word
+    char* desiredWords = "dear\ntest\n";
+    //char desiredWordsArr[numDesWords][MAXWORD];
+    //memset(desiredWordsArr, 0, (numDesWords*MAXWORD*sizeof(char)));
+    //strcpy(desiredWordsArr[0], "this");
+    //array to store association counts
+    //int* numFoundWords;
+    //numFoundWords = malloc(numDesWords);
+
+
  
 
     //DOES THIS NEED A CHECK
@@ -211,40 +246,96 @@ int main(int argc, char** argv){
     }
 
     printf("\n");
-    //CHANGE THIS
-    int numDesWords = 1;
-    //the word to be compares to others
-    char* compWord = "friend";
-    //the words to compare to the main word
-    char* desiredWords = "dear\ntest\n";
-    char desiredWordsArr[numDesWords][MAXWORD];
-    memset(desiredWordsArr, 0, (numDesWords*MAXWORD*sizeof(char)));
-    strcpy(desiredWordsArr[0], "this");
+    
+    //total number of sections divided by max threads, will truncate
+    int section = (int)((totalNum[1] - 1)/MAXTHREAD);
 
-    //declare info object and fill fields
-    threadInfo_t* info = (threadInfo_t*)malloc(sizeof(threadInfo_t));
-    info->charArr = charArr;
-    info->start = 0;
-    info->end = 3;
-    info->perLoc = periods;
-    info->desiredWords = desiredWords;
-    info->numDesWords = numDesWords;
-    info->compWord = compWord;
+    //declare four info structs for the threads
+    threadInfo_t* infoStructs[MAXTHREAD];
+    for(int i = 0; i < MAXTHREAD; i++){
+        infoStructs[i] = (threadInfo_t*)malloc(sizeof(threadInfo_t));
+        infoStructs[i]->charArr = charArr;
+        //beginning
+        infoStructs[i]->start = i * section;
+        //until end of first section
+        infoStructs[i]->end = (i + 1) * section;
+        infoStructs[i]->perLoc = periods;
+        infoStructs[i]->desiredWords = desiredWords;
+        infoStructs[i]->numDesWords = numDesWords;
+        infoStructs[i]->compWord = compWord;
+    }
 
-    int* numFoundWords = (int*)locate((void*)info);
+    //set the end value of the final struct to the end to account for num of sentences not divisible by 4
+    infoStructs[MAXTHREAD - 1]->end = periods[totalNum[1]-1];
+
+    pthread_t threads[MAXTHREAD]; 
+
+    //create threads
+    for(int i = 0; i < MAXTHREAD; i++){
+        pthread_create(&threads[i], NULL, locate, (void*)infoStructs[i]); 
+    }
+
+    //join threads
+    for(int i = 0; i < MAXTHREAD; i++){
+        pthread_join(threads[i], NULL);
+    }
+
+
+
+
+    ///pthread_create(&threads[1], NULL, locate, (void*)info2); 
+ 
+    // joining 4 threads i.e. waiting for all 4 threads to complete 
+   // for (int i = 0; i < MAX_THREAD; i++) 
+    pthread_join(threads[0], NULL); 
+    pthread_join(threads[1], NULL);
 
     printf("found1: %d\n", numFoundWords[0]);
     printf("found2: %d\n", numFoundWords[1]);
 
-    //pthread_t threads[MAX_THREAD]; 
- 
-    // Creating 4 threads 
-    //for (int i = 0; i < MAX_THREAD; i++) 
- //       pthread_create(&threads[i], NULL, sum_array, (void*)charArr); 
- 
-    // joining 4 threads i.e. waiting for all 4 threads to complete 
-   // for (int i = 0; i < MAX_THREAD; i++) 
-     //   pthread_join(threads[i], NULL); 
+    // //declare info object and fill fields
+    // threadInfo_t* info1 = (threadInfo_t*)malloc(sizeof(threadInfo_t));
+    // info1->charArr = charArr;
+    // //beginning
+    // info1->start = 0;
+    // //until end of first section
+    // info1->end = section;
+    // info1->perLoc = periods;
+    // info1->desiredWords = desiredWords;
+    // info1->numDesWords = numDesWords;
+    // info1->compWord = compWord;
+    // //info1->numFoundWords = numFoundWords;
+
+    // threadInfo_t* info2 = (threadInfo_t*)malloc(sizeof(threadInfo_t));
+    // info2->charArr = charArr;
+    // //beginning of second section
+    // info2->start = section;
+    // //end of section
+    // info2->end = section*2;
+    // info2->perLoc = periods;
+    // info2->desiredWords = desiredWords;
+    // info2->numDesWords = numDesWords;
+    // info2->compWord = compWord;
+    // //info2->numFoundWords = numFoundWords;
+
+    // threadInfo_t* info2 = (threadInfo_t*)malloc(sizeof(threadInfo_t));
+    // info2->charArr = charArr;
+    // //beginning of second section
+    // info2->start = section;
+    // //end of section
+    // info2->end = section*2;
+    // info2->perLoc = periods;
+    // info2->desiredWords = desiredWords;
+    // info2->numDesWords = numDesWords;
+    // info2->compWord = compWord;
+
+    //locate((void*)info1);
+
+
+    //info2->end = periods[totalNum[1]-1];
+
+
+
  
     // adding sum of all 4 parts 
     //int total_sum = 0; 

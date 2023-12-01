@@ -10,3 +10,7 @@ clean:
 
 	rm -f final
 
+
+final: final.c 
+	$(CC) $(CFLAGS) -o final final.c -lpthread
+
