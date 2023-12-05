@@ -17,6 +17,7 @@
 //LESS SENTENCES THAN 4
 //MUST END IN PUNCTUATION
 //ERROR FOR REALLOC
+//IS numDesWords NEEDED
 
 //num words as input
 //if it comes after another word
@@ -39,7 +40,7 @@
 
 //max size for file input name
 #define FILENAMESIZE 300
-//max size for array to hold all chars
+//size for array to hold all chars
 #define ARRSIZE 300
 //size for location markers
 #define LOCARRSIZE 50
@@ -61,7 +62,7 @@ typedef struct threadInfo{
     int end;
     int *perLoc;
     //number of desired words
-    int numDesWords;
+    //int numDesWords;
     //word everything will be compared to
     char* compWord;
     //desired words
@@ -108,7 +109,7 @@ int wordAppears(char* word, char* sent, int start, int end){
 
 void* locate(void* infoStruct){
     threadInfo_t* info = (threadInfo_t*) infoStruct;
-    int numDesWords = info->numDesWords;
+    //int numDesWords = info->numDesWords;
     char* words = info->desiredWords;
     //to hold counts of words
     //numFoundWords = malloc(numDesWords);
@@ -140,6 +141,9 @@ void* locate(void* infoStruct){
                 word[wordLoc] = words[k];
                 wordLoc++;
                 k++;
+                if(k == strlen(info->desiredWords)){
+                    break;
+                }
             }
             //convert to string with nothing extra at end
             word[wordLoc] = '\0';
@@ -199,11 +203,13 @@ int main(int argc, char** argv){
     //CHANGE THIS
 
     
-    int numDesWords = 2;
+    //int numDesWords = 2;
     //the word to be compares to others
-    char* compWord = "friend";
+    char* compWord = malloc(MAXWORD);
     //the words to compare to the main word
-    char* desiredWords = "dear\ntest\n";
+    char desiredWordsArray[MAXWORD*MAXWORDCOMP];
+    //convert so it can be used in the struct
+    char* desiredWords = malloc(MAXWORD*MAXWORDCOMP);
     //char desiredWordsArr[numDesWords][MAXWORD];
     //memset(desiredWordsArr, 0, (numDesWords*MAXWORD*sizeof(char)));
     //strcpy(desiredWordsArr[0], "this");
@@ -215,8 +221,9 @@ int main(int argc, char** argv){
  
 
     //DOES THIS NEED A CHECK
+    //get file name
+    printf("Please enter the text file you would like to analyze:\n");
     scanf("%s",filename);
-    //
     if ((ptr = fopen(filename,"r")) == NULL){
        printf("Error! opening file\n");
        exit(1);
@@ -252,6 +259,45 @@ int main(int argc, char** argv){
         arrFull[0]++;
         totalNum[0]++;
     }
+    fclose(ptr);
+    printf("\n");
+
+    //read in list of desired words
+    printf("Please enter the a file with words you would like to compare\n");
+    printf("A word can be at most %d characters long and at most %d words can be entered\n", MAXWORD, MAXWORDCOMP);
+    printf("The words should be formatted with one word on each line and no punctuation in between\n");
+
+    
+    FILE *dWords;
+    //read in desired file
+    char filenameWords[FILENAMESIZE];
+    scanf("%s",filenameWords);
+    if ((dWords = fopen(filenameWords,"r")) == NULL){
+       printf("Error! opening file\n");
+       exit(1);
+    }
+
+    //keep track of loc withing array
+    int desWordArrLoc = 0;
+    while((ch = fgetc(dWords)) != EOF){
+        desiredWordsArray[desWordArrLoc] = ch;
+        desWordArrLoc++;
+    }
+    //add null terminator to create string
+    desiredWordsArray[desWordArrLoc] = '\0';
+    //copy to struct usable format
+    strcpy(desiredWords, desiredWordsArray);
+    
+    fclose(dWords);
+    printf("\n");
+
+    //read in comp words
+    char tempCompWord[MAXWORD];
+    printf("Enter the word you would like to compare to others\n");
+    printf("It can only be %d characters long and must contain only characters\n", MAXWORD);
+    scanf("%s", tempCompWord);
+    //copy to actual storage for struct
+    strcpy(compWord, tempCompWord);
     // for(int i=0;i<totalNum[0];i++){
     //     printf("%c",charArr[i]);
     // }
@@ -273,7 +319,7 @@ int main(int argc, char** argv){
         infoStructs[i]->end = ((i + 1) * section)-1;
         infoStructs[i]->perLoc = periods;
         infoStructs[i]->desiredWords = desiredWords;
-        infoStructs[i]->numDesWords = numDesWords;
+        //infoStructs[i]->numDesWords = numDesWords;
         infoStructs[i]->compWord = compWord;
     }
 
@@ -293,6 +339,56 @@ int main(int argc, char** argv){
         pthread_join(threads[j], NULL);
     }
     pthread_mutex_destroy(&lock);
+
+
+    printf("found1: %d\n", numFoundWords[0]);
+    printf("found2: %d\n", numFoundWords[1]);
+    printf("found3: %d\n", numFoundWords[2]);
+
+    //create file with owner read/write permissions and group read permissions
+    //code taken from files demo
+    int fd = open("results.txt", O_RDWR | O_CREAT | O_APPEND, 0640);
+
+    //fprintf(fd,"found1: %d\n", numFoundWords[0]);
+    //account for size words, spaces, new lines, and values
+    char str[(MAXWORD + 12)*MAXWORDCOMP];
+    sprintf(str, "The selected word is '%s'\n", compWord);
+
+    //keep track of location withing current word
+    int wordLoc = 0;
+    //store current word
+    char word[MAXWORD];
+    //keep track of num words processed
+    int wordsProc = 0;
+
+    //iterate through all desired words
+    for(int k = 0; k < strlen(desiredWords); k++){
+            //isolate each word
+            //desired words are seperated by new line
+            while((desiredWords[k] != '\n')){
+                word[wordLoc] = desiredWords[k];
+                wordLoc++;
+                k++;
+                //check if at end
+                if(k == strlen(desiredWords)){
+                    break;
+                }
+            }
+            sprintf(str + strlen(str), "%s:  %d\n", word, numFoundWords[wordsProc]);
+            wordsProc++;
+            for(int j = 0; j < wordLoc; j++){
+                word[j] = '\0';
+            }
+            //empty string
+            wordLoc = 0;
+    }
+    // for(int i = 0; i < 3; i++){
+    //     sprintf(str + strlen(str), "%d\n", numFoundWords[i]);
+    // }
+    write(fd, str, strlen(str));
+    close(fd);
+    
+    
     // locate(infoStructs[0]);
     // locate(infoStructs[1]); 
     // locate(infoStructs[2]);
@@ -311,9 +407,6 @@ int main(int argc, char** argv){
    // for (int i = 0; i < MAX_THREAD; i++) 
     //pthread_join(threads[0], NULL); 
     //pthread_join(threads[1], NULL);
-
-    printf("found1: %d\n", numFoundWords[0]);
-    printf("found2: %d\n", numFoundWords[1]);
 
     // //declare info object and fill fields
     // threadInfo_t* info1 = (threadInfo_t*)malloc(sizeof(threadInfo_t));
