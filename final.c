@@ -1,5 +1,7 @@
 //CHECK MAKEFILE
+//CHECK REQUIRED LIBRARIES
 //CLOSE FILE
+//FREE
 //DOES SCANF NEED A CHECK
 //DOES THE SIZE OF REALLOC ADD TO EXISTING SIZE OR REDEFINE
 //CHECK WHICH LIBRARIES ARE NEEDED
@@ -13,8 +15,11 @@
 //PLURALS
 //DOES strcpy NEED MALLOC
 //LESS SENTENCES THAN 4
+//MUST END IN PUNCTUATION
+//ERROR FOR REALLOC
 
 //num words as input
+//if it comes after another word
 
 
 //options:
@@ -90,7 +95,8 @@ int wordAppears(char* word, char* sent, int start, int end){
             //MAKE SURE TO TEST THIS
             //if word is found, make sure that it is the end of a word
             //COULD BE COMMA, SEMICOLON ETC.
-            if(sentLoc == (wordLength-1) && (sent[i + sentLoc + 1] == ' ')){
+            int nextChar = sent[i + sentLoc + 1] == ' ';
+            if((sentLoc == (wordLength-1)) && ((nextChar < 65) || (nextChar > 122))){
                 contains = 1;
                 break;
             }
@@ -118,14 +124,14 @@ void* locate(void* infoStruct){
     char* charArr = info->charArr;
     //check for all desired words
     //IS END-1 CORRECT?
-    for(int i = info->start; i < info->end; i++){
+    for(int i = info->start; i <= info->end; i++){
         wordArrLoc = 0;
         //get charArr position for beginning and end of sentence
         sentStart = info->perLoc[i];
         sentEnd = info->perLoc[i+1];
         //check if compare word is in sentence, if it is not move to next
         if (wordAppears(compWord, charArr, sentStart, sentEnd) == 0){
-            break;
+            continue;
         }
         for(int k = 0; k < strlen(info->desiredWords); k++){
             //isolate each word
@@ -156,10 +162,15 @@ void* locate(void* infoStruct){
 
         }
     }
-    pthread_exit(NULL);
+    return NULL;
 }
 
 int main(int argc, char** argv){
+    //initialize lock  
+    if (pthread_mutex_init(&lock, NULL) != 0) { 
+        printf("\n mutex init has failed\n"); 
+        return 1; 
+    } 
     //to hold text file to ba analyzed
     FILE *ptr;
     //read in desired file
@@ -225,10 +236,10 @@ int main(int argc, char** argv){
         //set first element to 0 so it starts at beginning of sentence
         //periods[0] = 0;
         //totalNum[1]++;
-        if(ch == '.'){
+        if((ch == '.') || (ch == '!') || (ch == '?')){
             //check if arry is full
             if(arrFull[1] == (LOCARRSIZE - 1)){
-                periods = realloc(periods, totalNum[1]);
+                periods = realloc(periods, (totalNum[1] + LOCARRSIZE));
                 arrFull[1] = 0;
             }
             //set location in periods array to the currentt location within the file
@@ -241,13 +252,14 @@ int main(int argc, char** argv){
         arrFull[0]++;
         totalNum[0]++;
     }
-    for(int i=0;i<totalNum[0];i++){
-        printf("%c",charArr[i]);
-    }
+    // for(int i=0;i<totalNum[0];i++){
+    //     printf("%c",charArr[i]);
+    // }
 
-    printf("\n");
+    // printf("\n");
     
     //total number of sections divided by max threads, will truncate
+    //subtract one becasue totalNum is incremented after last addition
     int section = (int)((totalNum[1] - 1)/MAXTHREAD);
 
     //declare four info structs for the threads
@@ -257,8 +269,8 @@ int main(int argc, char** argv){
         infoStructs[i]->charArr = charArr;
         //beginning
         infoStructs[i]->start = i * section;
-        //until end of first section
-        infoStructs[i]->end = (i + 1) * section;
+        //until end of first section, remove
+        infoStructs[i]->end = ((i + 1) * section)-1;
         infoStructs[i]->perLoc = periods;
         infoStructs[i]->desiredWords = desiredWords;
         infoStructs[i]->numDesWords = numDesWords;
@@ -266,9 +278,10 @@ int main(int argc, char** argv){
     }
 
     //set the end value of the final struct to the end to account for num of sentences not divisible by 4
-    infoStructs[MAXTHREAD - 1]->end = periods[totalNum[1]-1];
+    //subtract two to account for last incement and program will process next in array
+     infoStructs[MAXTHREAD - 1]->end = (totalNum[1]-2);
 
-    pthread_t threads[MAXTHREAD]; 
+     pthread_t threads[MAXTHREAD]; 
 
     //create threads
     for(int i = 0; i < MAXTHREAD; i++){
@@ -276,19 +289,28 @@ int main(int argc, char** argv){
     }
 
     //join threads
-    for(int i = 0; i < MAXTHREAD; i++){
-        pthread_join(threads[i], NULL);
+    for(int j = 0; j < MAXTHREAD; j++){
+        pthread_join(threads[j], NULL);
     }
+    pthread_mutex_destroy(&lock);
+    // locate(infoStructs[0]);
+    // locate(infoStructs[1]); 
+    // locate(infoStructs[2]);
+    // locate(infoStructs[3]);
 
+    //printf("start: %c, end: %c\n",charArr[periods[infoStructs[0]->start]+3], 
+    //charArr[periods[infoStructs[0]->end]-1]);
 
+    //ISSUE: 3 AT VERY END, 2 ONE SENTENCE BEOFRE END
 
+   // printf("check\n");
 
     ///pthread_create(&threads[1], NULL, locate, (void*)info2); 
  
     // joining 4 threads i.e. waiting for all 4 threads to complete 
    // for (int i = 0; i < MAX_THREAD; i++) 
-    pthread_join(threads[0], NULL); 
-    pthread_join(threads[1], NULL);
+    //pthread_join(threads[0], NULL); 
+    //pthread_join(threads[1], NULL);
 
     printf("found1: %d\n", numFoundWords[0]);
     printf("found2: %d\n", numFoundWords[1]);
