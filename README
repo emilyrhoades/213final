@@ -1,0 +1,10 @@
+The purpose of this program is to perform a textual analysis on word association.
+
+Input:
+It take a file to analyze as input. All files must be in txt format and the file names must be less than 300 characters.
+Then, it takes a list of words to look for in the text. Any word can be at most 30 characters and at most 100 words can be entered.
+Each of these words should be on a new line with no punctuation in between.
+Finally, the program will prompt for a word that the others will be compared to. This can be at most 30 characters long.
+
+Output:
+The results are written to a file called "resuts.txt"

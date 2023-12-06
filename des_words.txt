@@ -1,3 +1,9 @@
-dear
-test
-cat
+love
+hate
+ugly
+pretty
+wish
+dream
+kill
+good
+bad
