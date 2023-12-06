@@ -1,4 +1,0 @@
-The selected word is 'friend'
-dear:  7
-test:  9
-cat:  1
