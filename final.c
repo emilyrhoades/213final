@@ -1,12 +1,3 @@
-//ERROR HANDLING
-// -pthread
-// -scanf
-//CAN IT HANDLE THINGS OTHER THAN LETTERS
-
-
-
-
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,12 +26,13 @@ pthread_mutex_t lock;
 //keep track of total number of found words
 int totalWords = 0;
 
-
+//struct containing information to be passed to threads
 typedef struct threadInfo{
     char* charArr;
     //will be the indices within the periods array
     int start;
     int end;
+    //contains indices of overy sentence ending punctuation in the text
     int *perLoc;
     //word everything will be compared to
     char* compWord;
@@ -49,29 +41,38 @@ typedef struct threadInfo{
 } threadInfo_t;
 
 
-//return 0 if the word appears in the sentence and 1 if it does
 
-int wordAppears(char* word, char* sent, int start, int end){
-    //size_t sentLength = strlen(sent);
+/**
+ * Determines if a word appears within a given piece of text
+ *
+ * \param word  The word that is being searched for in the text
+ * \param charArr The complete input text to be analysed
+ * \param start The index within the complete text of the start of the sentence to be searched
+ * \param end The index within the complete text that marks the end of the sentence to be searched
+ * \return Returns 0 if the word is not in the sentence and 1 if it is
+ */
+int wordAppears(char* word, char* charArr, int start, int end){
     size_t wordLength = strlen(word);
-    //location of start of word if found, 0 if not
+    //1 if word is found, 0 if not
     int contains = 0;
     //keep track of location within sentence after start location
     int sentLoc = 0;
-    int numWords = 0;
-    //iterate through sentence until is could not contain word
+    //iterate through sentence until it could not contain word
     for(int i=start; i<(end-1); i++){
+        //if the word has been found, exit
         if(contains != 0){
             break;
         }
         //if a letter doesn't match, begin looking again
+        //continue until all letters match for length of word
         for(int j=0; j<wordLength; j++){
-            if(word[j] != sent[i+sentLoc]){
+            if(word[j] != charArr[i+sentLoc]){
                 sentLoc = 0;
                 break;
             }
             //if word is found, make sure that it is the end of a word
-            int nextChar = sent[i + sentLoc + 1]; 
+            //it iis considered the end of a word if it is followed by anything other than a letter
+            int nextChar = charArr[i + sentLoc + 1]; 
             if((sentLoc == (wordLength-1)) && ((nextChar < 65) || (nextChar > 122))){
                 contains = 1;
                 break;
@@ -82,13 +83,26 @@ int wordAppears(char* word, char* sent, int start, int end){
     return contains;
 }
 
+/**
+ * Thread function: runs simultaneously to find counts of co-oucurring main word and desired words
+ *
+ * \param infoStruct Struct containing a char* of the conplete desired text, 
+ *                   start and end indices for the period array which denote which section a thread will analyze,
+ *                   the array containing period locations (or other sentence ending punctuation), the main word,
+ *                   and the words to compare it to
+ */
+
 void* locate(void* infoStruct){
     threadInfo_t* info = (threadInfo_t*) infoStruct;
     char* words = info->desiredWords;
     //to hold counts of words
-    //hold array of word counts
     char word[MAXWORD];
     char* wordStr = malloc(sizeof(char)*MAXWORD);
+    if(wordStr== NULL){
+        printf("Memory allocation error\n");
+        exit(1);
+    }    
+    //keep track of location within individual words and the array
     int wordLoc = 0;
     int wordArrLoc = 0;
     //hold start and end of desired sentence
@@ -121,12 +135,8 @@ void* locate(void* infoStruct){
             word[wordLoc] = '\0';
             strcpy(wordStr, word);
             //check that the word is not the same as the main word
-            if(strcmp(wordStr, compWord) == 0){
-                printf("One of the comparison words is the same as the main word. This will disrupt results.\n");
-            }
-            //if word appears increment association count
+            //if word appears increment association count and count of total found associations
             if(wordAppears(word, info->charArr, sentStart, sentEnd) == 1){
-                //((threadInfo_t*) infoStruct)->numFoundWords[wordArrLoc]++;
                 pthread_mutex_lock(&lock);
                 numFoundWords[wordArrLoc]++;
                 totalWords++;
@@ -148,18 +158,24 @@ void* locate(void* infoStruct){
 }
 
 int main(int argc, char** argv){
+    //many things must be declared ass arrays for the purpose of adding to thm dynamically and then 
+    //converted into pointers so they can be passed into a struct
     //initialize lock  
     if (pthread_mutex_init(&lock, NULL) != 0) { 
         printf("\n mutex init has failed\n"); 
         return 1; 
     } 
-    //to hold text file to ba analyzed
+    //to hold text file to be analyzed
     FILE *ptr;
     //read in desired file
     char filename[FILENAMESIZE];
     //store chars
     char *charArr = NULL;
     charArr = malloc(ARRSIZE);
+    if(charArr == NULL){
+        printf("Memory allocation error\n");
+        return 1;
+    }
     //hold chars as they are read in
     char ch;
     //array to keep track of of how full arrays are
@@ -169,21 +185,33 @@ int main(int argc, char** argv){
     //array to keep track of total in arrays, same indices as above
     //start periods at 1 becasue first sentence will begin at 0, not loc of first period
     int totalNum[2] = {0,1};
-    //keep track of period locations
+    //keep track of period (or other sentence ending punctuation) locations
     int *periods = NULL;
     periods = malloc(LOCARRSIZE*sizeof(int));
+    if(periods == NULL){
+        printf("Memory allocation error\n");
+        return 1;
+    }    
     //set start location to 0
     periods[0] = 0;
     //the word to be compares to others
     char* compWord = malloc(MAXWORD);
+    if(compWord== NULL){
+        printf("Memory allocation error\n");
+        return 1;
+    }   
     //the words to compare to the main word
     char desiredWordsArray[MAXWORD*MAXWORDCOMP];
     //convert so it can be used in the struct
     char* desiredWords = malloc(MAXWORD*MAXWORDCOMP);
-    //sore number of threads, adjustable uncase number of sentences less then threads
+    if(desiredWords == NULL){
+        printf("Memory allocation error\n");
+        return 1;
+    }   
+    //store number of threads, adjustable uncase number of sentences less then threads
     int numThreads = MAXTHREAD;
     //get file name
-    printf("Please enter the text file you would like to analyze:\n");
+    printf("Please enter the text file you would like to analyze in .txt format:\n");
     scanf("%s",filename);
     if ((ptr = fopen(filename,"r")) == NULL){
        printf("Error! opening file\n");
@@ -199,13 +227,21 @@ int main(int argc, char** argv){
         if(arrFull[0] == (ARRSIZE - 1)){
             //resize if it is full
             charArr = realloc(charArr, (totalNum[0] + ARRSIZE));
+            if(charArr == NULL){
+                printf("Memory allocation error\n");
+                return 1;
+             }           
             arrFull[0] = 0;
         }
         //set first element to 0 so it starts at beginning of sentence
-        if((ch == '.') || (ch == '!') || (ch == '?')){
+        if((ch == '.') || (ch == '!') || (ch == '?')|| (ch == ';')){
             //check if arry is full
             if(arrFull[1] == (LOCARRSIZE - 1)){
                 periods = realloc(periods, ((LOCARRSIZE + totalNum[1])*sizeof(int)));
+                if(periods == NULL){
+                    printf("Memory allocation error\n");
+                    return 1;
+                }       
                 arrFull[1] = 0;
             }
             //set location in periods array to the currentt location within the file
@@ -218,7 +254,10 @@ int main(int argc, char** argv){
         arrFull[0]++;
         totalNum[0]++;
     }
-    fclose(ptr);
+    if(fclose(ptr) == EOF){
+        printf("Error closing file\n");
+        return 1;
+    }
     printf("\n");
 
     //check is number of sentences is less then threads
@@ -227,7 +266,7 @@ int main(int argc, char** argv){
     }
 
     //read in list of desired words
-    printf("Please enter the a file with words you would like to compare\n");
+    printf("Please enter the a file with words you would like to compare in .txt format\n");
     printf("A word can be at most %d characters long and at most %d words can be entered\n", MAXWORD, MAXWORDCOMP);
     printf("The words should be formatted with one word on each line and no punctuation in between\n");
 
@@ -251,13 +290,18 @@ int main(int argc, char** argv){
     desiredWordsArray[desWordArrLoc] = '\0';
     //copy to struct usable format
     strcpy(desiredWords, desiredWordsArray);
-    fclose(dWords);
+    if(fclose(dWords)==EOF){
+        printf("Error closing file\n");
+        return 1;
+    }
+
     printf("\n");
 
     //read in comp words
     char tempCompWord[MAXWORD];
     printf("Enter the word you would like to compare to others\n");
     printf("It can only be %d characters long and must contain only characters\n", MAXWORD);
+    printf("If multiple words are entered, only the first will be considered\n");
     scanf("%s", tempCompWord);
     //convert to lowercase
     for(int i = 0; i< MAXWORD; i++){
@@ -271,10 +315,14 @@ int main(int argc, char** argv){
     //subtract one becasue totalNum is incremented after last addition
     int section = (int)((totalNum[1] - 1)/numThreads);
 
-    //declare four info structs for the threads
+    //declare info structs for the threads
     threadInfo_t* infoStructs[numThreads];
     for(int i = 0; i < numThreads; i++){
         infoStructs[i] = (threadInfo_t*)malloc(sizeof(threadInfo_t));
+        if(infoStructs[i] == NULL){
+            printf("Memory allocation error\n");
+            return 1;
+        }       
         infoStructs[i]->charArr = charArr;
         //beginning
         infoStructs[i]->start = i * section;
@@ -293,16 +341,21 @@ int main(int argc, char** argv){
 
     //create threads
     for(int i = 0; i < numThreads; i++){
-        pthread_create(&threads[i], NULL, locate, (void*)infoStructs[i]); 
+        if(pthread_create(&threads[i], NULL, locate, (void*)infoStructs[i])){
+            perror("pthread_create failed\n");
+            exit(EXIT_FAILURE);
+        } 
     }
 
     //join threads
     for(int j = 0; j < numThreads; j++){
-        pthread_join(threads[j], NULL);
+        if(pthread_join(threads[j], NULL)){
+            perror("pthread_join failed");
+            exit(EXIT_FAILURE);
+        }
         free(infoStructs[j]);
     }
     pthread_mutex_destroy(&lock);
-    //printf("%d\n", totalWords);
 
     free(charArr);
     free(periods);
@@ -310,6 +363,10 @@ int main(int argc, char** argv){
     //create file with owner read/write permissions and group read permissions
     //code taken from files demo
     int fd = open("results.txt", O_RDWR | O_CREAT | O_APPEND, 0640);
+    if(fd == -1){
+        printf("Error opening file\n");
+        return 1;
+    }
 
     //account for size words, spaces, new lines, and values
     char str[(MAXWORD + 12)*MAXWORDCOMP];
@@ -355,6 +412,10 @@ int main(int argc, char** argv){
     sprintf(str + strlen(str), "\n\n");
     //write results to file
     write(fd, str, strlen(str));
-    close(fd);
+    if(close(fd) == -1){
+        printf("Error closing file\n");
+        return 1;
+    }
+    printf("\nResults have been stored in results.txt\n");
     return 0;
 }

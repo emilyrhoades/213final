@@ -1,0 +1,4 @@
+dear
+friend,
+test
+char

@@ -1,0 +1,60 @@
+The selected file is 'little_women.txt'
+The selected word is 'he'
+love:   165   0.23
+hate:   14   0.02
+ugly:   7   0.01
+pretty:   94   0.13
+wish:   72   0.10
+dream:   5   0.01
+kill:   18   0.03
+good:   288   0.41
+bad:   47   0.07
+
+
+The selected file is 'little_women.txt'
+The selected word is 'she'
+love:   51   0.19
+hate:   7   0.03
+ugly:   4   0.01
+pretty:   43   0.16
+wish:   24   0.09
+dream:   2   0.01
+kill:   8   0.03
+good:   107   0.40
+bad:   22   0.08
+
+
+The selected file is 'scarlet_letter.txt'
+The selected word is 'he'
+love:   29   0.17
+hate:   1   0.01
+ugly:   8   0.05
+pretty:   3   0.02
+wish:   5   0.03
+dream:   12   0.07
+kill:   20   0.12
+good:   90   0.52
+bad:   5   0.03
+
+
+The selected file is 'scarlet_letter.txt'
+The selected word is 'she'
+love:   9   0.32
+hate:   1   0.04
+ugly:   1   0.04
+pretty:   0   0.00
+wish:   0   0.00
+dream:   0   0.00
+kill:   4   0.14
+good:   12   0.43
+bad:   1   0.04
+
+
+The selected file is 'pride_and_prejudice.txt'
+The selected word is 'elizabeth'
+darcy:   36   0.29
+jane:   75   0.60
+lydia:   15   0.12
+charles:   0   0.00
+
+
